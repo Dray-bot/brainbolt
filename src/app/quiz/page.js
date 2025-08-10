@@ -1,86 +1,175 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { QUESTIONS } from '@/lib/questions'
 
-export default function QuizPage() {
+const containerVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+  exit: { opacity: 0, y: -10, transition: { duration: 0.3 } },
+}
+
+const buttonVariants = {
+  hover: { scale: 1.05 },
+  tap: { scale: 0.95 },
+}
+
+function shuffleArray(array) {
+  const arr = [...array]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+export default function QuizV2() {
   const router = useRouter()
   const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [answers, setAnswers] = useState(Array(QUESTIONS.length).fill(null))
   const [score, setScore] = useState(0)
 
+  const [shuffledOptions, setShuffledOptions] = useState([])
+
+  useEffect(() => {
+    const shuffled = QUESTIONS.map(q => shuffleArray(q.options))
+    setShuffledOptions(shuffled)
+  }, [])
+
   const handleAnswer = (option) => {
-    const isCorrect = option === QUESTIONS[currentQuestion].answer
-    if (isCorrect) {
-      setScore((prev) => prev + 1)
-    }
-    if (currentQuestion + 1 < QUESTIONS.length) {
-      setCurrentQuestion((prev) => prev + 1)
-    } else {
-      router.push(`/results?score=${score + (isCorrect ? 1 : 0)}`)
+    const newAnswers = [...answers]
+    newAnswers[currentQuestion] = option
+    setAnswers(newAnswers)
+  }
+
+  const calculateScore = () => {
+    let total = 0
+    answers.forEach((ans, i) => {
+      if (ans === QUESTIONS[i].answer) total++
+    })
+    return total
+  }
+
+  const handleNext = () => {
+    if (currentQuestion < QUESTIONS.length - 1) {
+      setCurrentQuestion(currentQuestion + 1)
     }
   }
 
-  const progressPercent = ((currentQuestion + 1) / QUESTIONS.length) * 100
+  const handlePrev = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1)
+    }
+  }
+
+  const handleSubmit = () => {
+    const totalScore = calculateScore()
+    setScore(totalScore)
+    router.push(`/results?score=${totalScore}`)
+  }
+
+  if (shuffledOptions.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Loading quiz...</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-red-50 to-white px-4">
-      {/* Progress bar */}
-      <div className="w-full max-w-md mb-6">
-        <div className="h-2 bg-red-100 rounded-full">
-          <div
-            className="h-2 bg-red-500 rounded-full transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
-          ></div>
-        </div>
-      </div>
-
-      {/* Question */}
-      <h1
-        key={currentQuestion}
-        className="text-3xl font-bold text-red-600 mb-4 animate-fadeIn"
+    <motion.div
+      className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow-md mt-12 overflow-hidden"
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      variants={containerVariants}
+      key={currentQuestion}
+    >
+      <motion.h2
+        className="text-2xl font-bold mb-4"
+        key={`q-num-${currentQuestion}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
       >
-        Question {currentQuestion + 1}
-      </h1>
-      <p
-        key={`q-${currentQuestion}`}
-        className="text-lg text-gray-800 mb-6 text-center animate-fadeIn delay-100"
+        Question {currentQuestion + 1} / {QUESTIONS.length}
+      </motion.h2>
+
+      <motion.p
+        className="mb-6 text-gray-700"
+        key={`q-text-${currentQuestion}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
       >
         {QUESTIONS[currentQuestion].question}
-      </p>
+      </motion.p>
 
-      {/* Options */}
-      <div className="space-y-4 w-full max-w-md">
-        {QUESTIONS[currentQuestion].options.map((option, idx) => (
-          <button
-            key={option}
-            onClick={() => handleAnswer(option)}
-            className="w-full px-4 py-2 rounded-lg bg-white border border-red-300 hover:bg-red-100 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-sm"
-            style={{ animation: `fadeIn 0.3s ease ${idx * 0.1}s both` }}
-          >
-            {option}
-          </button>
-        ))}
+      <div className="space-y-4 mb-6">
+        <AnimatePresence mode="wait">
+          {shuffledOptions[currentQuestion].map((option) => (
+            <motion.button
+              key={option}
+              onClick={() => handleAnswer(option)}
+              className={`w-full text-left px-4 py-3 rounded-lg border transition
+                ${
+                  answers[currentQuestion] === option
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-gray-100 hover:bg-red-50 border-transparent'
+                }`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              whileTap="tap"
+              variants={buttonVariants}
+              transition={{ duration: 0.3 }}
+            >
+              {option}
+            </motion.button>
+          ))}
+        </AnimatePresence>
       </div>
 
-      {/* Animations */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease forwards;
-        }
-        .delay-100 {
-          animation-delay: 0.1s;
-        }
-      `}</style>
-    </div>
+      <div className="flex justify-between">
+        <motion.button
+          onClick={handlePrev}
+          disabled={currentQuestion === 0}
+          className={`px-5 py-2 rounded-lg font-semibold transition
+            ${
+              currentQuestion === 0
+                ? 'bg-gray-300 cursor-not-allowed text-gray-600'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+          whileHover={currentQuestion !== 0 ? 'hover' : ''}
+          whileTap={currentQuestion !== 0 ? 'tap' : ''}
+          variants={buttonVariants}
+        >
+          Previous
+        </motion.button>
+
+        {currentQuestion === QUESTIONS.length - 1 ? (
+          <motion.button
+            onClick={handleSubmit}
+            className="px-5 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition"
+            whileHover="hover"
+            whileTap="tap"
+            variants={buttonVariants}
+          >
+            Submit
+          </motion.button>
+        ) : (
+          <motion.button
+            onClick={handleNext}
+            className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition"
+            whileHover="hover"
+            whileTap="tap"
+            variants={buttonVariants}
+          >
+            Next
+          </motion.button>
+        )}
+      </div>
+    </motion.div>
   )
 }

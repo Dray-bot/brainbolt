@@ -9,7 +9,7 @@ export default function ResultsPageContent() {
   const params = useSearchParams()
   const router = useRouter()
   const score = Number(params.get('score')) || 0
-  const totalQuestions = 10
+  const totalQuestions = 20
 
   const [shareUrl, setShareUrl] = useState('')
 
